@@ -1,0 +1,6 @@
+字段名		处理方式					注释
+cellphone	!						手机号
+type		!						用户类型
+linkman		!						联系人
+remark		!						备注信息(资质问题或其他)
+Sys_Object	com.ldyy.plug.AppSpl

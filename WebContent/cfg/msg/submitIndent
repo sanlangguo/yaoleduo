@@ -1,0 +1,5 @@
+字段名			处理方式			注释
+submit			$submit
+Sys_Object		com.ldyy.plug.AppSpl
+Sys_B_method0	*indentID:indentID
+Sys_B_method1	*indentNum:indentNum

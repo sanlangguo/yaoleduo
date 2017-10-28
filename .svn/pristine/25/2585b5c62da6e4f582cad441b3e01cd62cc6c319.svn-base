@@ -1,0 +1,295 @@
+package com.ldyy.plug;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.Statement;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+
+import com.ldyy.data.Json;
+import com.ldyy.data.Tree;
+import com.ldyy.tool.Config;
+import com.ldyy.tool.DBCon;
+import com.ldyy.tool.DBCtrl;
+
+public class AppSpl {
+	private Logger log = Logger.getLogger(this.getClass());
+
+	public String getNo_(Tree<String> result, String arg) {
+		// !可使用新的数据库操作接口
+		Connection conn = DBCon.getConnection();
+		Statement stmt = null;
+		ResultSet rs = null;
+		try {
+			conn.setAutoCommit(false);
+			stmt = conn.createStatement();
+			String sql = "select serialNo from `serialno` where ID='" + arg
+					+ "' for update";
+			rs = stmt.executeQuery(sql);
+
+			rs.next();
+			String no = rs.getString("serialNo");
+			sql = "update `serialno` set serialNo=serialNo+1 where ID='" + arg
+					+ "'";
+
+			if (stmt.executeUpdate(sql) == 0) {
+				throw new RuntimeException("更新流水号错误");
+			}
+			conn.commit();
+			return no;
+		} catch (Throwable t) {
+			log.error("获取流水号时发生异常", t);
+			try {
+				conn.rollback();
+			} catch (Throwable e1) {
+				log.error("发生异常后，回滚失败。", e1);
+			}
+			result.put("ret", "-4");
+			result.put("rtmsg", "数据库错误");
+			result.put("Sys_closeFlag", "");
+			return null;
+		} finally {
+			DBCtrl.close(rs, stmt);
+			DBCon.releaseCon(conn);
+		}
+	}
+
+	public String concat_(Tree<String> result, String arg) {
+		String[] a1 = arg.split("=");
+		String[] a2 = a1[1].split("[+]");
+		StringBuilder sb = new StringBuilder();
+		for (String tmp : a2) {
+			if (tmp.startsWith("~"))
+				sb.append(result.get(tmp.substring(1)));
+			else
+				sb.append(tmp);
+		}
+		result.put(a1[0], sb.toString());
+		return null;
+	}
+
+	public void check(Tree<String> result, String str, String args) {
+		String[] tmp = args.split("/");
+		if (!result.get(tmp[0]).equals(result.get(tmp[1]))) {
+			result.put("ret", tmp[2]);
+			result.put("rtmsg", tmp[3]);
+			result.put("Sys_closeFlag", "");
+		}
+	}
+
+	public void authCode(Tree<String> result, String str) {
+		// 限制时间，避免被刷
+		result.put("authCode", "654321");
+	}
+
+	public void checkUser(Tree<String> result, String str) {
+		result.put(result.get("type"), result.get("value"));
+		boolean b = DBCtrl.select("Customer", result,
+				new String[] { result.get("type") }, new String[] { "ID" });
+		if (b) {
+			result.put("ret", "1");
+			result.put("rtmsg", "用户已存在");
+			result.put("Sys_closeFlag", "");
+		}
+	}
+
+	public void login(Tree<String> result, String str) {
+		result.put(result.get("type"), result.get("value"));
+		boolean c = DBCtrl.select("Customer", result,
+				new String[] { result.get("type"), "password" }, new String[] {
+						"type", "level", "ID", "cellphone", "linkman" });
+		String level = result.get("level");
+
+		if (!c) {
+			result.put("ret", "1");
+			result.put("rtmsg", "用户名或密码错误");
+			result.put("Sys_closeFlag", "");
+		} else if (level.equals("0")) {
+			result.put("ret", "2");
+			result.put("rtmsg", "未提交审核资料");
+			result.put("Sys_closeFlag", "");
+		} else if (level.equals("-1")) {
+			result.put("ret", "3");
+			result.put("rtmsg", "尚未审核");
+			result.put("Sys_closeFlag", "");
+		} else if (level.equals("-2")) {
+			result.put("ret", "4");
+			result.put("rtmsg", "资质审核未通过");
+			result.put("Sys_closeFlag", "");
+		}
+	}
+
+	public void drugList(Tree<String> result, String str) {
+		String[] tmp = result.get("search").toUpperCase().split(" {1,}");
+		int pageSize = Integer.parseInt(result.get("pageSize"));
+		int pageNum = Integer.parseInt(result.get("pageNum"));
+		StringBuilder where = new StringBuilder();
+		for (String tp : tmp) {
+			where.append(" search like '%").append(tp).append("%' and");
+		}
+		where.delete(where.length() - 4, where.length());
+		if (pageNum == 1) {
+			DBCtrl.selectOne("drugSearch", result,
+					new String[] { "count(ID)" }, where.toString());
+			result.put("size", result.remove("count(ID)"));
+		}
+		SimpleDateFormat date = new SimpleDateFormat("yyyy/MM/dd");
+		Date now = new Date();
+		String time = date.format(now);
+		result.put("time", time);
+
+		StringBuilder in = new StringBuilder();
+		in.append("select t.id from (select ID from `drugSearch` where")
+				.append(where.toString()).append(" limit ")
+				.append(pageSize * (pageNum - 1)).append(",").append(pageSize)
+				.append(") as t");
+		List<Tree<String>> drugL = drugL(result, in.toString(), "drugList");
+		for (Tree<String> t : drugL)
+			t.put("imgUrl", t.get("ID") + ".png");
+		addList(drugL, result, "drugList");
+	}
+
+	public void drugInfo(Tree<String> result, String str) {
+		String tmp = result.get("ID");
+		StringBuilder in = new StringBuilder();
+		in.append(tmp);
+		List<Tree<String>> drugL = drugL(result, in.toString(), "drugInfo");
+		result.addBranch(drugL.get(0));
+	}
+
+	
+	private static List<Tree<String>> drugL(Tree<String> result, String in,
+			String name) {
+		Map<String, String> cfg = Config.getM("drugL");
+		String str = cfg.keySet().toString().trim();
+		StringBuilder sb = new StringBuilder();
+		sb.append("select ").append(str.substring(1, str.length() - 1))
+				.append(" from `drug` where ID in (").append(in).append(")");
+		List<Tree<String>> drugL = DBCtrl.getSelectList(sb.toString(), name);
+		return drugL;
+	}
+
+	private static void addList(List<Tree<String>> l, Tree<String> father,
+			String name) {
+		if (l.size() == 0) {
+			Tree<String> t = new Tree<String>(name);
+			t.haveSameName = 1;
+			father.addBranch(t);
+		} else if (l.size() == 1) {
+			Tree<String> t = l.get(0);
+			t.haveSameName = 1;
+			father.addBranch(t);
+		} else {
+			father.addBranchs(l);
+		}
+	}
+
+	public void checkTrol(Tree<String> result, String str) {
+		// for (Tree<String> t : result.getBranchs("drugs")) {
+		//
+		// }
+		result.put("trolley", result.getBranch("trol").toString());
+	}
+
+	public void getTrol(Tree<String> result, String str) {
+		Map<String, String> data = DBCtrl
+				.getSelect("select trolley from customer where ID="
+						+ result.get("ID"));
+		String tmp = data.get("trolley");
+		if (tmp == null || tmp.length() == 0) {
+			addList(new ArrayList<Tree<String>>(), result, "trol");
+			addList(new ArrayList<Tree<String>>(), result, "trolInfo");
+			return;
+		}
+		Tree<String> trolley = Json.getTree(tmp);
+		trolley.reName("trol");
+		result.addBranch(trolley);
+		List<String> l = new ArrayList<String>();
+		for (Tree<String> t : trolley)
+			l.add(t.getName());
+		String in = l.toString().trim();
+		in = in.substring(1, in.length() - 1);
+		List<Tree<String>> drugL = drugL(result, in, "trolInfo");
+		Tree<String> trolInfo = new Tree<String>("trolInfo");
+		for (Tree<String> t : drugL) {
+			t.reName(t.get("ID"));
+			trolInfo.addBranch(t);
+		}
+		result.addBranch(trolInfo);
+	}
+
+	public void indent(Tree<String> result, String str) {
+		Tree<String> drugs = result.getBranch("drugs");
+		List<String> l = new ArrayList<String>();
+		for (Tree<String> t : drugs)
+			l.add(t.getName());
+		if (l.size() == 0) {
+			result.put("ret", "1");
+			result.put("rtmsg", "订单内容不能为空");
+			result.put("Sys_closeFlag", "");
+		}
+		Tree<String> indent = new Tree<String>("indent");
+		result.addBranch(indent);
+		String indentID = null;
+		Tree<String> notEnough = null;
+		String in = l.toString().trim();
+		in = in.substring(1, in.length() - 1);
+		StringBuilder sb = new StringBuilder();
+		sb.append(
+				"select ID,name,venderd,standard,expiry,approval,price,number from `drug` where ID in (")
+				.append(in).append(") for update");
+
+		Connection conn = DBCon.getConnection();
+		Statement stmt = null;
+		ResultSet rs = null;
+		String sql = null;
+		try {
+			conn.setAutoCommit(false);
+			stmt = conn.createStatement();
+			rs = stmt.executeQuery(sb.toString());
+			ResultSetMetaData rsmd = rs.getMetaData();
+
+			for (; rs.next();) {
+				Tree<String> data = new Tree<String>("drug");
+				for (int i = 1; i <= rsmd.getColumnCount(); i++) {
+					String value = rs.getString(i);
+					if (value == null)
+						continue;
+					data.put(rsmd.getColumnName(i), value.trim());
+				}
+				if (Integer.parseInt(data.get("number")) >= Integer
+						.parseInt(drugs.get(data.get("ID")))) {
+					if (indentID == null)
+						indentID = getNo_(result, "Indent");
+				} else {
+					if (notEnough == null)
+						notEnough = new Tree<String>("notEnough");
+					notEnough.addBranch(data);
+				}
+			}
+			if (stmt.executeUpdate(sql) == 0) {
+				throw new RuntimeException("更新流水号错误");
+			}
+			conn.commit();
+		} catch (Throwable t) {
+			log.error("获取流水号时发生异常", t);
+			try {
+				conn.rollback();
+			} catch (Throwable e1) {
+				log.error("发生异常后，回滚失败。", e1);
+			}
+			result.put("ret", "-4");
+			result.put("rtmsg", "数据库错误");
+			result.put("Sys_closeFlag", "");
+		} finally {
+			DBCtrl.close(rs, stmt);
+			DBCon.releaseCon(conn);
+		}
+	}
+}

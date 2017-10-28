@@ -1,0 +1,7 @@
+jdbc.driverClassName=com.mysql.jdbc.Driver
+jdbc.url=jdbc:mysql://localhost:8889/ldyy?useUnicode=true&characterEncoding=UTF-8&useServerPrepStmts=true&cachePrepStmts=true&prepStmtCacheSize=25&prepStmtCacheSqlLimit=256
+jdbc.username=root
+jdbc.password=123456
+jdbc.connectionCount=5
+
+uriHeader=/LDYY/

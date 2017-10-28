@@ -1,0 +1,9 @@
+字段名			处理方式				注释
+areaCode		!
+cellphone		!
+name			!
+pageNum			!
+pageSize		!
+Sys_Object	com.ldyy.plug.AppSpl
+Sys_A_method0	&userID:userID
+Sys_A_method1	$salesFlist

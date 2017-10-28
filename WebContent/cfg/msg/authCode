@@ -1,0 +1,6 @@
+字段名			处理方式					注释
+cellphone		!						手机号
+Sys_Object		com.ldyy.plug.AppSpl
+Sys_A_method0	$authCode
+Sys_A_method1	#authCode:authCode
+Sys_A_method2	#cellphone:cellphone

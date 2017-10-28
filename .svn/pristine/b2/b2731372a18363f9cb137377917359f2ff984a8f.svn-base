@@ -1,0 +1,6 @@
+字段名			处理方式			注释
+type			!				登陆方式
+value			!				方式值
+password		!				密码
+Sys_Object		com.ldyy.plug.AppSpl
+Sys_A_method0	$login

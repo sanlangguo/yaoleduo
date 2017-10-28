@@ -1,0 +1,330 @@
+package com.ldyy.data;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.NoSuchElementException;
+
+// 理论：http://blog.csdn.net/v_JULY_v/article/details/6530142/
+public class BTree<T extends Comparable<T>> {
+	final static int default_m = 5;
+	int m; // 此B-树的阶数。关键字数等于阶数-1。m至少为2，m必须大于等于2。
+	int n; // n是关键字最小个数
+	public BTNode root;
+
+	public BTree() {
+		this(default_m);
+	}
+
+	public BTree(int size) {
+		if (m < 2)
+			m = default_m;
+		if (m % 2 == 0) {
+			n = m / 2 - 1;
+		} else {
+			n = m / 2;
+		}
+		root = new BTNode(null);
+	}
+
+	class BTNode {
+		BTNode parent; // 父节点
+		List<T> keys = new ArrayList<T>(m); // 关键字
+		List<BTNode> pnts = new ArrayList<BTNode>(m + 1); // 分支
+	
+		// 关键字与分支都比实际最大容量大1，为了便于插入后分裂，如果不插入分裂，逻辑比较复杂
+		BTNode(BTNode parent) {
+			this.parent = parent;
+		}
+	}
+
+	public T findNode(T key) {
+		finder.clear();
+		BTNode node = findNode(key, root);
+		if (flag)
+			return node.keys.get(finder.removeFirst());
+		else
+			return null;
+	}
+
+	private boolean flag = false;
+	private Deque<Integer> finder = new LinkedList<Integer>();// 查找时的路径队列
+
+	private BTNode findNode(T key, BTNode node) {
+		int p, c, min = 0, max = node.keys.size() - 1;
+		while (max >= min) {
+			p = (min + max) / 2;
+			c = key.compareTo(node.keys.get(p));
+			if (c < 0) {
+				max = p - 1;
+			} else if (c > 0) {
+				min = p + 1;
+			} else {
+				flag = true;
+				finder.addFirst(p);
+				return node;
+			}
+		}
+		finder.addFirst(min);
+		if (node.pnts.size() == 0) {
+			flag = false;
+			return node;
+		} else {
+			return findNode(key, node.pnts.get(min));
+		}
+	}
+
+	public T insert(T key) {//if have return old, if not have insert and return new.
+		finder.clear();
+		BTNode node = findNode(key, root);
+		if (flag)
+			return node.keys.get(finder.removeFirst());
+		insert(key, node, null);
+		return key;
+	}
+
+	private void insert(T key, BTNode node, BTNode rnode) {
+		int p = finder.removeFirst();
+		node.keys.add(p, key);
+		if (rnode != null)//即非叶子节点，有指针
+			node.pnts.add(p + 1, rnode);
+		if (node.keys.size() < m)
+			return;
+		//分裂
+		key = node.keys.get(m / 2);
+		if (node.parent == null) {
+			root = new BTNode(null);
+			node.parent = root;
+			root.pnts.add(node);
+			finder.addFirst(0);
+		}
+		BTNode newnode = new BTNode(node.parent);
+		newnode.keys.addAll(node.keys.subList(m / 2 + 1, m));
+		List<T> newkeys = new ArrayList<T>(m);
+		newkeys.addAll(node.keys.subList(0, m / 2));
+		node.keys = newkeys;//由于removeRange方法受保护，其没有良好的范围删除方法，且数组删除效率低，故更换数组
+		if (rnode != null) {
+			newnode.pnts.addAll(node.pnts.subList(m / 2 + 1, m + 1));
+			for (int i = m / 2 + 1; i < m + 1; i++)
+				node.pnts.get(i).parent = newnode;
+			List<BTNode> newpnts = new ArrayList<BTNode>(m);
+			newpnts.addAll(node.pnts.subList(0, m / 2 + 1));
+			node.pnts = newpnts;//由于removeRange方法受保护，其没有良好的范围删除方法，且数组删除效率低，故更换数组
+		}
+		insert(key, node.parent, newnode);
+	}
+
+	public void delete(T info) {
+		BTNode temp = findNode(info, root);
+		if (temp.keys.size() == 0) {
+//			System.out.println("根节点为空！");
+			return;
+		}
+		for (T i : temp.keys) {
+			if (info.compareTo(i) == 0) {
+				delete(info, temp);
+				break;
+			} else if (temp.keys.indexOf(i) == temp.keys.size() - 1) {// 循环到最后一个值了，仍到这里，说明不存在要删除的值！
+//				System.out.println("不存在要删除的值！");
+			}
+		}
+	}
+
+	private void delete(T info, BTNode node) throws NoSuchElementException {
+		if (node == null) { // 其实到这里，就一定存在要删除的值了。
+			throw new NoSuchElementException();
+		} else {
+			int i;
+			for (i = 0; i < node.keys.size(); i++) {
+				if (info.compareTo(node.keys.get(i)) == 0) {
+					node.keys.remove(i); // 删除关键字，其实要是索引向文件，也应该删除文件。
+					break;
+				}
+			}
+			if (node.pnts.size() > 0) {// 删除一个非叶子节点的关键字后，如果有孩子，则判断孩子的孩子，如果孩子有孩子，则将右孩子的孩子最深左孩子的第一个值赋给删除关键字的节点
+				// 每一个关键字，一定有两个孩子
+				if (node.pnts.get(i + 1).pnts.size() == 0) {// 孩子没有孩子的时候，只将孩子的最左关键字上升。
+					node.keys.add(i, node.pnts.get(i + 1).keys.get(0));
+					node.pnts.get(i + 1).keys.remove(0);
+					if (node.pnts.get(i + 1).keys.size() < n) {
+						dManageNode(node.pnts.get(i + 1));
+					}
+				} else {// 孩子有孩子的时候，则将右孩子的孩子最深左孩子的第一个值赋给删除关键字的节点
+					pullRLeftNode(node, i, node.pnts.get(i + 1), i);
+				}
+
+			} else {// 如果没有孩子，要判断该节点关键字数量是否大于最小值
+				if (node.keys.size() >= n) {// 大于等于就没事，不用动
+					return;
+				} else {// 叶子节点中关键字数小于n，需要继续判断兄弟节点是否饱满
+					dManageNode(node);
+				}
+			}
+		}
+	}
+
+	public void combine(BTNode lnode, BTNode rnode) {
+		if (lnode.keys.size() < n) {
+			lnode.keys.add(lnode.parent.keys.get(lnode.parent.pnts
+					.indexOf(lnode)));
+			lnode.parent.keys.remove(lnode.parent.pnts.indexOf(lnode));
+		} else if (rnode.keys.size() < n) {
+			rnode.keys.add(0,
+					rnode.parent.keys.get(lnode.parent.pnts.indexOf(lnode)));
+			rnode.parent.keys.remove(lnode.parent.pnts.indexOf(lnode));
+		} else {
+			System.out.println("error");
+		}
+		lnode.keys.addAll(rnode.keys);
+		lnode.pnts.addAll(rnode.pnts);
+		for (BTNode n : rnode.pnts) {
+			n.parent = lnode;
+		}
+		lnode.parent.pnts.remove(lnode.parent.pnts.indexOf(lnode) + 1);
+		if (lnode.parent.parent == null && lnode.parent.keys.size() == 0) {// 父节点是根节点
+			lnode.parent = null; // lnode为新的根节点
+			root = lnode;
+			return;
+		}
+		if (lnode.parent.keys.size() < n) {
+			dManageNode(lnode.parent);
+		}
+	}
+
+	public void lrotate(BTNode lnode, BTNode rnode) {
+		lnode.keys.add(lnode.parent.keys.get(lnode.parent.pnts.indexOf(lnode)));
+		lnode.parent.keys.remove(lnode.parent.pnts.indexOf(lnode));
+		lnode.parent.keys.add(lnode.parent.pnts.indexOf(lnode),
+				rnode.keys.get(0));
+		rnode.keys.remove(0);
+		if (rnode.pnts.size() > 0) {// 要判断叶子节点没有孩子！
+			lnode.pnts.add(rnode.pnts.get(0));
+			rnode.pnts.remove(0);
+			lnode.pnts.get(lnode.pnts.size() - 1).parent = lnode;
+		}
+	}
+
+	public void rrotate(BTNode lnode, BTNode rnode) {
+		rnode.keys.add(rnode.parent.keys.get(lnode.parent.pnts.indexOf(lnode)));
+		rnode.parent.keys.remove(lnode.parent.pnts.indexOf(lnode));
+		rnode.parent.keys.add(lnode.parent.pnts.indexOf(lnode),
+				lnode.keys.get(lnode.keys.size() - 1));
+		lnode.keys.remove(lnode.keys.size() - 1);
+		if (lnode.pnts.size() > 0) {
+			rnode.pnts.add(0, lnode.pnts.get(lnode.pnts.size() - 1));
+			lnode.pnts.remove(lnode.pnts.size() - 1);
+			rnode.pnts.get(0).parent = rnode;
+		}
+	}
+
+	public void dManageNode(BTNode node) {// 叶子节点中关键字数小于n，需要继续判断兄弟节点是否饱满，是旋转还是合并
+		if (node.parent == null) {
+			return;
+		} else {
+			int x = node.parent.pnts.indexOf(node);
+			if (x == 0) {// 被删除关键字所在节点，是父节点最左边的节点时，判断右兄弟，而且肯定有右兄弟
+				if (node.parent.pnts.get(x + 1).keys.size() == n) {// 刚脱贫，需要合并
+					combine(node, node.parent.pnts.get(x + 1));
+				} else if (node.parent.pnts.get(x + 1).keys.size() > n) {// 关键字数大于最小值，丰满
+					lrotate(node, node.parent.pnts.get(x + 1));
+				} else {
+					System.out.println("error");
+				}
+			} else if (x == node.parent.pnts.size() - 1) {// 是父节点最右边的节点时，判断左兄弟
+				if (node.parent.pnts.get(x - 1).keys.size() == n) {// 左兄弟刚脱贫，需要合并
+					combine(node.parent.pnts.get(x - 1), node);
+				} else if (node.parent.pnts.get(x - 1).keys.size() > n) {// 关键字数大于最小值，丰满
+					rrotate(node.parent.pnts.get(x - 1), node);
+				} else {
+					System.out.println("error");
+				}
+			} else {// node在父节点的子节点的中间，需要先判断左兄弟，再判断右兄弟。靠，感觉判断兄弟是否饱满，还是应该写一个函数，也许可以传递两个值
+					// 先跟饱满的借，除非两个兄弟都刚脱贫。
+				if (node.parent.pnts.get(x - 1).keys.size() > n) {// 左兄弟丰满
+					rrotate(node.parent.pnts.get(x - 1), node);
+				} else if (node.parent.pnts.get(x + 1).keys.size() > n) {// 右兄弟丰满
+					lrotate(node, node.parent.pnts.get(x + 1));
+				} else {// 左右兄弟都刚脱贫，需要合并
+					combine(node.parent.pnts.get(x - 1), node);
+				}
+			}
+		}
+
+	}
+
+	public void pullRLeftNode(BTNode donode, int j, BTNode node, int i) {// 节点删除关键字后，如果该节点有孩子，则孩子需要贡献关键字，由于孩子减少了关键字还需要向下借，一直递归到叶子。
+		if (node.pnts.get(0).pnts.size() > 0) {
+			pullRLeftNode(donode, j, node.pnts.get(0), 0);
+		} else {
+			donode.keys.add(j, node.pnts.get(0).keys.get(0));
+			node.pnts.get(0).keys.remove(0);
+			if (node.pnts.get(0).keys.size() < n) {
+				dManageNode(node.pnts.get(0));
+			}
+		}
+	}
+
+	public void show(BTNode node, int deep) {
+		if (node.pnts.size() > 0) {
+			int i = 0;
+			for (BTNode n : node.pnts) {
+				show(n, deep + 1);
+				if (i < node.keys.size()) {
+					for (int j = 0; j < deep; j++)
+						System.out.print("  ");
+					System.out.println(node.keys.get(i).toString());
+					++i;
+				}
+			}
+		} else {// 叶子节点
+			if (node.keys.size() > 0) {
+				for (T t : node.keys) {
+					for (int j = 0; j < deep; j++)
+						System.out.print("  ");
+					System.out.println(t);
+				}
+			} else {// 叶子节点没有空值的时候，除非是根节点，根节点为空值的时候，说句话意思意思
+				System.out.println("B-树为空！");
+			}
+		}
+	}
+
+	private static BTree<Character> tree = new BTree<Character>();
+	private static BufferedReader reader = new BufferedReader(
+			new InputStreamReader(System.in));
+
+	private static String stringInput(String inputRequest) throws IOException {
+		System.out.println(inputRequest);
+		return reader.readLine();
+	}
+
+	public static void main(String[] args) throws IOException {
+		System.out.println("test B - balanced tree operations");
+		System.out.println("*****************************");
+		String input;
+		Character value;
+		do {
+			input = stringInput("please select: [i]nsert, [d]elete");
+			switch (input.charAt(0)) {
+			case 'i':
+				for (int i = 1; i < input.length(); i++) {
+					value = input.charAt(i);
+					tree.insert(value);
+				}
+				tree.show(tree.root, 0);
+				break;
+			case 'd':
+				for (int i = 1; i < input.length(); i++) {
+					value = input.charAt(i);
+					tree.delete(value);
+				}
+				tree.show(tree.root, 0);
+				break;
+			}
+		} while ((input.charAt(0) != 'e'));
+	}
+}

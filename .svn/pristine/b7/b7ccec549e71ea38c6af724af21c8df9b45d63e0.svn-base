@@ -1,0 +1,7 @@
+字段名			处理方式				注释
+drugs			!
+Sys_Object		com.ldyy.plug.AppSpl
+Sys_A_method0	&userID:ID
+Sys_A_method1	$indent
+Sys_A_method2	#indentID:indentID
+Sys_A_method3	#indentNum:indentNum

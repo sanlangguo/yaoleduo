@@ -1,0 +1,6 @@
+字段名		处理方式					注释
+Sys_Object	com.ldyy.plug.AppSpl
+Sys_dataMethod0	update
+Sys_dataBase0	customer
+Sys_dataKey0	cellphone
+Sys_dataCol0	password

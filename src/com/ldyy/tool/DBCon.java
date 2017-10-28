@@ -1,0 +1,116 @@
+package com.ldyy.tool;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
+import org.apache.log4j.Logger;
+
+public abstract class DBCon {
+	private static int connectionCount;
+	private static ConcurrentLinkedQueue<Connection> dbPool = new ConcurrentLinkedQueue<Connection>();
+	private static Logger log = Logger.getLogger(DBCon.class);
+
+	private static Timer t = new Timer();
+
+	public static void init() {
+		String driverClass = Config.get("jdbc.driverClassName");
+		final String url = Config.get("jdbc.url");
+		final String userName = Config.get("jdbc.username");
+		final String password = Config.get("jdbc.password");
+		connectionCount = Config.geti("jdbc.connectionCount");
+
+		try {
+			Class.forName(driverClass).newInstance();
+		} catch (Exception e) {
+			log.error("数据库驱动加载失败！", e);
+		}
+
+		for (int i = 0; i < connectionCount; i++) {
+			Connection con;
+			try {
+				con = DriverManager.getConnection(url, userName, password);
+				con.setAutoCommit(false);
+				dbPool.add(con);
+			} catch (Exception e) {
+				String s = "数据库连接建立失败，5秒后重试。如果持续失败，请关闭此系统并检查数据库，路由等软硬件设施或数据库相关配置文件";
+				log.error(i+ s, e);
+				i--;
+				try {
+					Thread.sleep(5000);
+				} catch (InterruptedException e1) {
+					log.error("", e1);
+				}
+			}
+		}// 启动定义数据库长连接
+		log.info("数据库连接池启动完毕");
+
+		t.scheduleAtFixedRate(new TimerTask() {
+			public void run() {
+				Connection con = null;
+				for (int i = 0; i < connectionCount; i++) {
+					con = dbPool.poll();
+					if (con != null) {
+						try {
+							con.commit();
+						} catch (SQLException e) {
+							log.error("连接自动提交或者连接无效", e);
+							boolean tf = false;
+							while (!tf) {
+								try {
+									con = DriverManager.getConnection(url, userName, password);
+									con.setAutoCommit(false);
+									dbPool.add(con);
+									tf = true;
+								} catch (Exception e1) {
+									String s = "数据库连接建立失败，5秒后重试。如果持续失败，请关闭此系统并检查数据库，路由等软硬件设施或数据库相关配置文件";
+									log.error(s, e1);
+									try {
+										Thread.sleep(5000);
+									} catch (InterruptedException e2) {
+										log.error("", e2);
+									}
+								}
+							}
+						}
+						dbPool.add(con);
+					} else {
+						i--;
+						try {
+							Thread.sleep(1);
+						} catch (Exception e) {
+							log.error("", e);
+						}
+					}
+				}
+			}
+		}, 0, 1000 * 30);
+	}
+
+	public static Connection getConnection() {
+		Connection con = null;
+		while (true) {
+			con = dbPool.poll();
+			if (con != null) {
+				return con;
+			}
+			try {
+				Thread.sleep(50);
+			} catch (Exception e) {
+				log.error("", e);
+			}
+		}
+	}
+
+	public static void releaseCon(Connection con) {
+		try {
+			con.commit();
+		} catch (SQLException e) {
+			log.error("", e);
+		}
+		dbPool.add(con);
+	}
+}

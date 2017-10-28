@@ -1,0 +1,6 @@
+字段名		处理方式					注释
+name			!					业务员姓名
+pageNum			!					页数
+pageSize		!					每页个数
+Sys_Object		com.ldyy.plug.AppSpl
+Sys_A_method0	$salesName

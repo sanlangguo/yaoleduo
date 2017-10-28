@@ -1,0 +1,5 @@
+字段名			处理方式				注释
+cellphone		!					业务员编号
+status			!					在职状态(0:在职,1:离职)
+Sys_Object		com.ldyy.plug.AppSpl
+Sys_A_method0	$deleteSales

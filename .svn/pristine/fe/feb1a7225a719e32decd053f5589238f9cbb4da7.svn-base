@@ -1,0 +1,7 @@
+字段名			处理方式			注释
+ID				!				编号
+cellphone		!				手机号
+name			!				姓名
+grade			!
+status			!				是否在职(0：代表在职，1：已离职)
+date			!				入职时间

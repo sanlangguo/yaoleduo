@@ -1,0 +1,5 @@
+字段名			处理方式				注释
+drugList		!
+size			!
+date			$getDate
+Sys_Object		com.ldyy.plug.AppSpl

@@ -1,0 +1,80 @@
+package com.ldyy.plug;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
+
+import org.apache.log4j.Logger;
+
+import com.ldyy.data.Tree;
+import com.ldyy.tool.DBCon;
+import com.ldyy.tool.DBCtrl;
+
+public class AppSpl {
+	private Logger log = Logger.getLogger(this.getClass());
+
+	public String getNo_(Tree<String> result, String arg) {
+		// !可使用新的数据库操作接口
+		Connection conn = DBCon.getConnection();
+		Statement stmt = null;
+		ResultSet rs = null;
+		try {
+			conn.setAutoCommit(false);
+			stmt = conn.createStatement();
+			String sql = "select serialNo from `serialno` where ID='" + arg
+					+ "' for update";
+			rs = stmt.executeQuery(sql);
+			;
+
+			rs.next();
+			String no = rs.getString("serialNo");
+			sql = "update `serialno` set serialNo=serialNo+1 where ID='" + arg
+					+ "'";
+
+			if (stmt.executeUpdate(sql) == 0) {
+				throw new RuntimeException("更新流水号错误");
+			}
+			conn.commit();
+			return no;
+		} catch (Throwable t) {
+			log.error("获取流水号时发生异常", t);
+			try {
+				conn.rollback();
+			} catch (Throwable e1) {
+				log.error("发生异常后，回滚失败。", e1);
+			}
+			result.put("ret", "-4");
+			result.put("rtmsg", "数据库错误");
+			result.put("Sys_closeFlag", "");
+			return null;
+		} finally {
+			DBCtrl.close(rs, stmt);
+			DBCon.releaseCon(conn);
+		}
+	}
+
+	public void check(Tree<String> result, String str, String args) {
+		String[] tmp = args.split("/");
+		if (!result.get(tmp[0]).equals(result.get(tmp[1]))) {
+			result.put("ret", tmp[2]);
+			result.put("rtmsg", tmp[3]);
+			result.put("Sys_closeFlag", "");
+		}
+	}
+
+	public void authCode(Tree<String> result, String str) {
+		// TODO
+		// 限制时间，避免被刷
+		result.put("authCode", "654321");
+	}
+
+	public void checkUser(Tree<String> result, String str) {
+		boolean b = DBCtrl.select("Customer", result, new String[] { result.get("type") },
+				new String[] { "ID" });
+		if (!b) {
+			result.put("ret", "1");
+			result.put("rtmsg", "用户已存在");
+			result.put("Sys_closeFlag", "");
+		}
+	}
+}

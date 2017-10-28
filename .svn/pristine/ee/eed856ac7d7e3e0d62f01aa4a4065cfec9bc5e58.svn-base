@@ -1,0 +1,14 @@
+字段名		处理方式					注释
+cellphone	!
+name		!
+type		!
+areaCode	!
+address		!
+ID			$getNo:Customer
+date		$getDate
+Sys_Object	com.ldyy.plug.AppSpl
+Sys_A_method0	$concat:AID=~ID+0
+Sys_dataMethod0	insert
+Sys_dataBase0	customer
+Sys_dataMethod1	insert
+Sys_dataBase1	address

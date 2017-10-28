@@ -1,0 +1,82 @@
+function $(str) {
+	return document.getElementById(str);
+}
+
+function GetHttpRequest() {
+	var http_request = false;
+	// 开始初始化XMLHttpRequest对象
+	if (window.XMLHttpRequest) { // Mozilla 浏览器
+		http_request = new XMLHttpRequest();
+		if (http_request.overrideMimeType) {// 设置MiME类别
+			http_request.overrideMimeType("text/javascript");
+		}
+	} else if (window.ActiveXObject) { // IE浏览器
+		try {
+			http_request = new ActiveXObject("Msxml2.XMLHTTP");
+		} catch (e) {
+			try {
+				http_request = new ActiveXObject("Microsoft.XMLHTTP");
+			} catch (e) {
+			}
+		}
+	}
+	if (!http_request) { // 异常，创建对象实例失败
+		window.alert("不能创建XMLHttpRequest对象实例.");
+	}
+	return http_request;
+}
+
+var draco = null;
+
+function post(url, mes, fun) {
+	var hr = GetHttpRequest();
+	hr.onreadystatechange = function() {
+		if (hr.readyState == 4) { // 判断对象状态
+			if (hr.status == 200) { // 信息已经成功返回，开始处理信息
+				var tmp = hr.getResponseHeader("Draco");
+				if (tmp.length > 0)
+					draco = tmp;
+				alert(draco);
+				fun(hr.responseText);
+			} else { // 页面不正常
+				alert("您所请求的页面有异常。");
+			}
+		}
+	};
+	hr.open("POST", url, true);
+	hr.send(mes);
+}
+
+function get(url, fun) {
+	var hr = GetHttpRequest();
+	hr.onreadystatechange = function() {
+		if (hr.readyState == 4) { // 判断对象状态
+			if (hr.status == 200) { // 信息已经成功返回，开始处理信息
+				var tmp = hr.getResponseHeader("Draco");
+				if (tmp.length > 0)
+					draco = tmp;
+				fun(hr.responseText);
+			} else { // 页面不正常
+				alert("您所请求的页面有异常。");
+			}
+		}
+	};
+	hr.open("GET", url, true);
+	hr.send(null);
+}
+
+function callServer(url, fun, msg) {
+	if (draco != null)
+		url = url + ";jsessionid=" + draco;
+	if (msg == "")
+		get(url, fun);
+	else 
+		post(url, msg, fun);
+}
+
+function submit() {
+	function fun(str) {
+		$("answer").innerHTML=str;
+	}
+	callServer($("url").value, fun, $("json").innerHTML);
+}

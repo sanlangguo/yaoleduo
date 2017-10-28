@@ -1,0 +1,150 @@
+package com.ldyy.data;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
+
+public class Json {
+	public static String toString(Tree<String> tree) {
+		StringBuilder sb = new StringBuilder();
+		if (tree.ll != null)
+			changeMap(tree, sb);
+		else if (tree.getValue() != null)
+			return tree.getValue();
+		else
+			return "";
+		return sb.toString();
+	}
+
+	private static void changeMap(Tree<String> tree, StringBuilder sb) {
+		sb.append("{");
+		for (Tree<String> tmp : tree.listBranchs()) {
+			if (tmp.haveSameName == 2)
+				continue;
+			sb.append("\"").append(tmp.getName()).append("\":");
+			if (tmp.haveSameName == 1 || (tmp.getName().endsWith("List")
+					&& tmp.haveSameName != 2)) {
+				changeList(tree.getBranchs(tmp.getName()), sb);
+				sb.append(",");
+			} else {
+				if (tmp.ll != null) {
+					changeMap(tmp, sb);
+					sb.append(",");
+				} else {
+					if (tmp.getValue() != null)
+						sb.append("\"").append(tmp.getValue()).append("\",");
+					else
+						sb.append(" ");
+				}
+			}
+		}
+		sb.deleteCharAt(sb.length() - 1);
+		sb.append("}");
+	}
+
+	private static void changeList(Iterable<Tree<String>> ltree,
+			StringBuilder sb) {
+		sb.append("[");
+		for (Tree<String> tmp : ltree) {
+			if (tmp.ll != null) {
+				changeMap(tmp, sb);
+				sb.append(",");
+			} else {
+				if (tmp.getValue() != null)
+					sb.append("\"").append(tmp.getValue()).append("\",");
+				else
+					sb.append(" ");
+			}
+		}
+		sb.deleteCharAt(sb.length() - 1);
+		sb.append("]");
+	}
+
+	public static Tree<String> getTree(String str) {
+		if (str == null)
+			return null;
+		int index0 = 0;
+		int index2 = 0;
+		boolean context = false;
+		boolean escape = false;
+		Deque<String> path = new ArrayDeque<String>();
+		String present = "root";
+		Tree<String> tree = null;
+
+		for (int i = 0; i < str.length(); i++) {
+			char c = str.charAt(i);
+			if (c == '"' && !escape)
+				context = !context;
+			if (c == '\\' && !escape)
+				escape = true;
+			else
+				escape = false;
+			if (context)
+				continue;
+
+			if (c == '{') {
+				if (path.size() != 0 && path.getLast().startsWith("["))
+					present = path.getLast().substring(1);
+				path.add("{" + present);
+				Tree<String> father = tree;
+				tree = new Tree<String>(present);
+				if (father != null) {
+					father.addBranch(tree);
+				}
+				index0 = i + 1;
+			} else if (c == ':') {
+				String tag = str.substring(index0, i).trim();
+				if (tag.startsWith("\"")) {
+					tag = tag.substring(1, tag.length() - 1);
+				}
+				index2 = i + 1;
+				present = tag.trim();
+			} else if (c == ',') {
+				index0 = i + 1;
+				String value = str.substring(index2, i).trim();
+				if (!value.endsWith("}") && !value.endsWith("]")) {
+					if (value.startsWith("\""))
+						value = value.substring(1, value.length() - 1).trim();
+					if (path.getLast().startsWith("{")) {
+						tree.put(present, value);
+					} else if (path.getLast().startsWith("[")) {
+						present = path.getLast().substring(1);
+						tree.add(present, value);
+//						Tree<String> tmp = new Tree<String>(present, value);
+//						tree.addBranch(tmp);
+					}
+				}
+				if (path.getLast().startsWith("["))
+					index2 = i + 1;
+			} else if (c == '}') {
+				String value = str.substring(index2, i).trim();
+				if (!value.endsWith("}") && !value.endsWith("]")) {
+					if (value.startsWith("\""))
+						value = value.substring(1, value.length() - 1).trim();
+					if (!value.startsWith("{"))
+						tree.put(present, value);
+				}
+				if (tree.getParent() == null)
+					return tree;
+				tree = tree.getParent();
+				path.removeLast();
+			} else if (c == '[') {
+				if (path.size() != 0 && path.getLast().startsWith("["))
+					present = path.getLast().substring(1);
+				path.add("[" + present);
+				index2 = i + 1;
+			} else if (c == ']') {
+				String value = str.substring(index2, i).trim();
+				if (!value.endsWith("}") && !value.endsWith("]")) {
+					if (value.startsWith("\""))
+						value = value.substring(1, value.length() - 1).trim();
+					present = path.getLast().substring(1);
+					tree.add(present, value);
+//					Tree<String> tmp = new Tree<String>(present, value);
+//					tree.addBranch(tmp);
+				}
+				path.removeLast();
+			}
+		}
+		return null;
+	}
+}

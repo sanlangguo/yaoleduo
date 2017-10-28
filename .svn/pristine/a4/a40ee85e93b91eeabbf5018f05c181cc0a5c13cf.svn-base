@@ -1,0 +1,13 @@
+字段名			处理方式			注释
+ID				!
+remark			!
+level			!
+Sys_Object	com.ldyy.plug.AppSpl
+Sys_dataMethod0	update
+Sys_dataBase0	customer
+Sys_dataKey0	ID
+Sys_dataCol0	level
+Sys_dataMethod1	update
+Sys_dataBase1	customer
+Sys_dataKey1	ID
+Sys_dataCol1	remark

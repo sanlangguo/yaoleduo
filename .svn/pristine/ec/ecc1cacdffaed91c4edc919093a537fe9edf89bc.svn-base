@@ -1,0 +1,7 @@
+字段名			处理方式					注释
+level			-1
+Sys_Object		com.ldyy.plug.AppSpl
+Sys_dataMethod0	update
+Sys_dataBase0	customer
+Sys_dataKey0	ID
+Sys_dataCol0	level
